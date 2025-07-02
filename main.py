@@ -1,34 +1,63 @@
-
+from fastapi import FastAPI, Request
 import os
 import dotenv
-import requests
+import httpx
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 
+# Initialize FastAPI app
+app = FastAPI(
+    title='Weather API',
+    version='1.0.0',
+    description='A simple API to fetch current weather data for a given city.',
+)
 
+# Load templates
+templates = Jinja2Templates(directory="templates")
+
+# Load environment variables
 dotenv.load_dotenv()
-
 API_KEY = os.getenv("WEATHER_API")
 
-def weather(city):
-    base_url = "http://api.openweathermap.org/data/2.5/weather"
+# Base URL for OpenWeatherMap API
+WEATHER_URL = "http://api.openweathermap.org/data/2.5/weather"
+
+
+@app.get("/", response_class=HTMLResponse)
+async def read_form(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/weather", response_class=HTMLResponse)
+async def get_weather(request: Request, city: str):
     params = {
-        'q' : city,
-        'appid' : API_KEY,
-        'units' : 'metric'
+        'q': city,
+        'appid': API_KEY,
+        'units': 'metric'
     }
-    response = requests.get(base_url,params=params)
 
-    if response.status_code == 200 :
+    async with httpx.AsyncClient() as client:
+        response = await client.get(WEATHER_URL, params=params)
+
+    weather_info = None
+    error = None
+
+    if response.status_code == 200:
         data = response.json()
-        print("\n🌤️ Weather in", data['name'])
-        print("Country:", data['sys']['country'])
-        print("Temperature:", data['main']['temp'], "°C")
-        print("Feels like:", data['main']['feels_like'], "°C")
-        print("Humidity:", data['main']['humidity'], "%")
-        print("Description:", data['weather'][0]['description'].title())
+        weather_info = {
+            "city": data['name'],
+            "country": data['sys']['country'],
+            "temp": data['main']['temp'],
+            "feels_like": data['main']['feels_like'],
+            "humidity": data['main']['humidity'],
+            "description": data['weather'][0]['description'].title()
+        }
     else:
-        print("❌ Error fetching weather data.")
-        print("HTTP Status Code:", response.status_code)
-        print("Response text:", response.text)
+        error = f"Error fetching weather data (Status Code {response.status_code})"
 
-city = str(input("enter your city name : "))
-weather(city)
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "weather": weather_info,
+        "city": city,
+        "error": error
+    })
