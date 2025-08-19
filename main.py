@@ -49,6 +49,7 @@ async def get_weather(request: Request, city: str):
             "country": data['sys']['country'],
             "temp": data['main']['temp'],
             "feels_like": data['main']['feels_like'],
+            "wind_speed": data['wind']['speed'],
             "humidity": data['main']['humidity'],
             "description": data['weather'][0]['description'].title()
         }
